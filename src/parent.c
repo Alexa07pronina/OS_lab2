@@ -59,10 +59,12 @@ static int parent_main(int argc, char* argv[]) {
     if (file1_handle == -1) {
         fprintf(stderr, "Error: failed to open file1\n");
     }
-    else file2_handle = open_file_for_write(file2);
-    if (file2_handle == -1) {
-        fprintf(stderr, "Error: failed to open file2\n");
-    }
+    else {
+        file2_handle = open_file_for_write(file2);
+            if (file2_handle == -1) {
+                fprintf(stderr, "Error: failed to open file2\n");
+            }
+        }
 
     if (file1_handle == -1 || file2_handle == -1)
     {
