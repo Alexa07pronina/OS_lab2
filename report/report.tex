@@ -1,0 +1,368 @@
+\documentclass[pdf, unicode, 12pt, a4paper, oneside, fleqn]{article}
+
+% ==============================================================================
+% СТИЛИ (точное копирование styles/log-style.sty из шаблонного репозитория)
+% ==============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[english,russian]{babel}
+
+\usepackage{geometry}
+\geometry{
+  a4paper,
+  left=2.54cm,
+  right=2.54cm,
+  top=2.54cm,
+  bottom=2.54cm,
+  headheight=0mm,
+  headsep=0mm,
+  footnotesep=0mm,
+  footskip=0mm,
+}
+
+\usepackage{nopageno}
+\usepackage{tempora}
+\renewcommand{\ttdefault}{cmtt}
+
+\usepackage{titlesec}
+\titleformat*{\section}{\large\bfseries}
+\titlespacing\section{0pt}{12pt plus 4pt minus 2pt}{0pt plus 2pt minus 2pt}
+\setcounter{secnumdepth}{0}
+
+\usepackage{enumitem}
+\frenchspacing
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage[table]{xcolor}
+\usepackage{array}
+\usepackage{color}
+\usepackage{xcolor}
+\usepackage{csquotes}
+
+\DeclareQuoteStyle{russian}
+	{\guillemotleft}{\guillemotright}[0.025em]
+	{\quotedblbase}{\textquotedblleft}
+\ExecuteQuoteOptions{style=russian}
+
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{alltt}
+
+\newcommand{\MYhref}[3][blue]{\href{#2}{\color{#1}{#3}}}
+
+\lstset{
+  tabsize=2,
+  breaklines=true,
+  columns=fullflexible,
+  flexiblecolumns=true,
+  numbers=left,
+  numberstyle={\footnotesize},
+  extendedchars=true,
+  inputencoding=utf8,
+  frame=single,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\bfseries\color{green!40!black},
+  commentstyle=\itshape\color{gray},
+  identifierstyle=\color{black},
+  stringstyle=\color{blue},
+  showstringspaces=false
+}
+
+\def\@xobeysp{ }
+\def\verbatim@processline{\hspace{1.2cm}\raggedright\the\verbatim@line\par}
+
+\parindent=0pt
+\parskip=3pt
+
+\definecolor{lightgray}{gray}{0.9}
+\renewcommand{\thesubsection}{\arabic{subsection}}
+
+% ==============================================================================
+% НАЧАЛО ДОКУМЕНТА
+% ==============================================================================
+\begin{document}
+
+\graphicspath{ {./img/} }
+
+% ------------------------------------------------------------------------------
+% ТИТУЛЬНЫЙ ЛИСТ (src/titlepage.tex)
+% ------------------------------------------------------------------------------
+\begin{titlepage}
+\begin{center}
+\large
+МОСКОВСКИЙ АВИАЦИОННЫЙ ИНСТИТУТ (НАЦИОНАЛЬНЫЙ ИССЛЕДОВАТЕЛЬСКИЙ УНИВЕРСИТЕТ)
+
+\vspace{20pt}
+
+Институт №8 <<Компьютерные науки и прикладная математика>>
+
+Кафедра 806 <<Вычислительная математика и программирование>>
+\end{center}
+
+\vspace{60pt}
+
+\begin{center}
+\bfseries
+\large
+Отчет по лабораторной работе \textnumero 2 по курсу \enquote{Операционные системы}
+\end{center}
+
+\vspace{40pt}
+
+\begin{center}
+\bfseries
+\large
+Тема: \enquote{Управление процессами и межпроцессное взаимодействие посредством каналов (Pipe)}
+\end{center}
+
+\vfill
+
+\begin{flushright}
+\large
+\begin{tabular}{rl}
+Выполнил(а): & А.\,Е. Пронина \\
+Группа: & М8О-203БВ-25 \\
+Преподаватель: & Е.\,С. Миронов \\
+\end{tabular}
+\end{flushright}
+
+\vspace{40pt}
+
+\begin{center}
+\large
+Москва, \the\year
+\end{center}
+\end{titlepage}
+
+\pagebreak
+
+% ------------------------------------------------------------------------------
+% УСЛОВИЕ (src/problem.tex)
+% ------------------------------------------------------------------------------
+\section{Условие}
+
+{\bfseries Цель работы:} приобретение практических навыков управления процессами в операционной системе и обеспечения обмена данными между ними посредством неименованных каналов (pipe), а также перенаправления стандартных потоков ввода-вывода дочерних процессов.
+
+{\bfseries Задание:} родительский процесс создает два дочерних процесса. Первой и второй строкой пользователь в консоль родительского процесса вводит имена файлов, которые будут использованы для открытия на запись для child1 и child2 соответственно. Родительский и дочерний процессы представлены разными программами. Родительский процесс принимает от пользователя строки произвольной длины и пересылает их в pipe1 или в pipe2 в зависимости от правила фильтрации. Процессы child1 и child2 производят работу над строками и пишут результаты своей работы в стандартный вывод (перенаправленный в файлы).
+
+{\bfseries Вариант:} 18 (Группа 5). Правило фильтрации: нечетные строки отправляются в pipe1, четные в pipe2. Дочерние процессы удаляют все гласные из строк.
+
+\pagebreak
+
+% ------------------------------------------------------------------------------
+% МЕТОД РЕШЕНИЯ И ОПИСАНИЕ (src/src.tex)
+% ------------------------------------------------------------------------------
+\section{Метод решения}
+Программа реализована с использованием кроссплатформенного подхода, абстрагирующего системные вызовы POSIX (Linux/macOS) и Win32 API (Windows). 
+
+Алгоритм работы родительского процесса:
+\begin{enumerate}
+    \item Запрос имен двух выходных файлов у пользователя и их открытие на запись с флагами создания/усечения (\texttt{O\_WRONLY | O\_CREAT | O\_TRUNC} / \texttt{CREATE\_ALWAYS}).
+    \item Создание двух неименованных каналов (\texttt{pipe} / \texttt{CreatePipe}).
+    \item Двукратный вызов функции создания дочернего процесса. Перед запуском исполняемого файла дочернего процесса стандартный поток ввода (\texttt{stdin}) перенаправляется на читающий конец соответствующего канала, а стандартный поток вывода (\texttt{stdout}) — на дескриптор открытого файла. В POSIX это достигается через \texttt{dup2}, в Windows — через структуру \texttt{STARTUPINFO} с флагом \texttt{STARTF\_USESTDHANDLES}.
+    \item Родительский процесс закрывает все ненужные ему концы каналов (читающие концы обоих каналов), чтобы избежать утечек дескрипторов.
+    \item В цикле считываются строки из \texttt{stdin}. Нечетные строки записываются в \texttt{pipe1}, четные — в \texttt{pipe2}.
+    \item После получения признака конца файла (EOF) от пользователя, родительский процесс закрывает пишущие концы каналов. Это критически важно: только когда все дескрипторы пишущего конца закрыты, системный вызов \texttt{read} в дочернем процессе вернет 0 (EOF), позволяя ему корректно завершить цикл чтения.
+    \item Ожидание завершения дочерних процессов (\texttt{waitpid} / \texttt{WaitForSingleObject}) и вывод их кодов возврата.
+\end{enumerate}
+
+\section{Описание программы}
+Проект разделен на модули для обеспечения чистоты архитектуры и соответствия инженерным требованиям:
+\begin{itemize}
+    \item \texttt{headers/*.h}: объявление кроссплатформенных структур и прототипов функций.
+    \item \texttt{realization/*\_posix.c} и \texttt{realization/*\_win.c}: реализация системно-зависимых функций (\texttt{open\_file\_for\_write}, \texttt{create\_pipe}, \texttt{create\_child\_process}).
+    \item \texttt{parent.c}: основная логика оркестрации процессов.
+    \item \texttt{child.c}: логика обработки данных (удаление гласных).
+\end{itemize}
+
+Ключевой фрагмент перенаправления потоков в дочернем процессе (POSIX):
+\begin{lstlisting}[language=C]
+if (pid == 0) { // Дочерний процесс
+    if (stdin_handle != -1) {
+        if (dup2((int)stdin_handle, STDIN_FILENO) == -1) {
+            _exit(1);
+        }
+    }
+    if (stdout_handle != -1) {
+        if (dup2((int)stdout_handle, STDOUT_FILENO) == -1) {
+            _exit(1);
+        }
+    }
+    execvp(executable, argv);
+    _exit(1);
+}
+\end{lstlisting}
+
+\pagebreak
+
+% ------------------------------------------------------------------------------
+% РЕЗУЛЬТАТЫ РАБОТЫ (адаптация src/benchmark.tex)
+% ------------------------------------------------------------------------------
+\section{Результаты работы}
+
+Программа была протестирована на наборе из шести строк, содержащих как гласные, так и согласные буквы. Ввод строк завершался нажатием Ctrl+D (сигнал EOF). Ниже приведены примеры работы системы.
+
+\subsection*{Консольный вывод родительского процесса}
+В консоли отображаются только сообщения родительского процесса: его PID, запрос имен файлов, PID созданных дочерних процессов и коды их завершения после окончания работы.
+
+\begin{lstlisting}[language=bash, caption=Вывод в консоль родительского процесса]
+$ ./parent
+[Parent] PID: 89233
+Enter output file for Child1: ch1
+Enter output file for Child2: ch2
+[Parent] Child1 created with PID: 89265
+[Parent] Child2 created with PID: 89266
+Enter lines (Ctrl+D / Ctrl+Z to finish):
+fdg
+sdfon
+ainaaon
+aaass
+aiaoaiau
+jnv
+[Parent] Child1 (PID: 89265) exit code: 0
+[Parent] Child2 (PID: 89266) exit code: 0
+[Parent] Results written to: ch1, ch2
+\end{lstlisting}
+
+\subsection*{Содержимое выходных файлов}
+
+Поскольку стандартный поток вывода (\texttt{stdout}) дочерних процессов перенаправлен в файлы, служебные сообщения о запуске и завершении, а также результаты обработки строк, записываются непосредственно в файлы.
+
+Файл \texttt{ch1} содержит результаты обработки \textbf{нечетных} строк (1, 3, 5):
+\begin{itemize}
+    \item Строка 1: \texttt{fdg} $\rightarrow$ \texttt{fdg} (гласных нет)
+    \item Строка 3: \texttt{ainaaon} $\rightarrow$ \texttt{nn} (удалены a, i, a, a, o)
+    \item Строка 5: \texttt{aiaoaiau} $\rightarrow$ \texttt{""} (все символы — гласные, остается только символ перевода строки)
+\end{itemize}
+
+\begin{lstlisting}[language=text, caption=Содержимое файла ch1]
+[Child1] PID: 89265, started
+fdg
+nn
+
+[Child1] PID: 89265, finished
+\end{lstlisting}
+
+Файл \texttt{ch2} содержит результаты обработки \textbf{четных} строк (2, 4, 6):
+\begin{itemize}
+    \item Строка 2: \texttt{sdfon} $\rightarrow$ \texttt{sdfn} (удалена o)
+    \item Строка 4: \texttt{aaass} $\rightarrow$ \texttt{ss} (удалены a, a, a)
+    \item Строка 6: \texttt{jnv} $\rightarrow$ \texttt{jnv} (гласных нет)
+\end{itemize}
+
+\begin{lstlisting}[language=text, caption=Содержимое файла ch2]
+[Child2] PID: 89266, started
+sdfn
+ss
+jnv
+[Child2] PID: 89266, finished
+\end{lstlisting}
+
+\subsection*{Анализ результатов}
+Результаты полностью соответствуют заданию Варианта 18:
+\begin{enumerate}
+    \item Нечетные строки корректно перенаправлены в \texttt{pipe1} и обработаны дочерним процессом 1, результат записан в файл \texttt{ch1}.
+    \item Четные строки корректно перенаправлены в \texttt{pipe2} и обработаны дочерним процессом 2, результат записан в файл \texttt{ch2}.
+    \item Все гласные буквы (a, e, i, o, u) удалены из строк.
+    \item Служебные сообщения дочерних процессов (PID, статус запуска/завершения) присутствуют в выходных файлах, что подтверждает корректность перенаправления потока \texttt{stdout} в файлы посредством системных вызовов \texttt{dup2} (POSIX) / \texttt{STARTUPINFO} (Win32).
+    \item Оба дочерних процесса завершились с кодом возврата 0, что свидетельствует об отсутствии ошибок выполнения и корректном получении EOF после закрытия родительским процессом пишущих концов каналов.
+\end{enumerate}
+\pagebreak
+
+
+\section*{Диагностика системных вызовов (strace)}
+Для подтверждения использования нативных системных примитивов ОС был проведен анализ профиля системных вызовов программы с помощью утилиты \texttt{strace}. Запуск осуществлялся с флагом \texttt{-f} для трассировки всех дочерних процессов и фильтрацией по категориям \texttt{process, ipc, write}.
+
+Ниже приведены ключевые фрагменты реального лога выполнения, демонстрирующие жизненный цикл процессов и межпроцессное взаимодействие:
+
+\begin{lstlisting}[language=bash, caption=Фрагмент вывода strace (ключевые системные вызовы)]
+strace -f -e trace=process,ipc,write  ./parent
+execve("./parent", ["./parent"], 0x7ffdfdb7dcc8 /* 38 vars */) = 0
+write(1, "[Parent] PID: 91777\n", 20[Parent] PID: 91777
+)   = 20
+write(1, "Enter output file for Child1: ", 30Enter output file for Child1: ) = 30
+child1
+write(1, "Enter output file for Child2: ", 30Enter output file for Child2: ) = 30
+child2
+clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLDstrace: Process 91850 attached
+, child_tidptr=0x7f572d39fa10) = 91850
+[pid 91777] clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLDstrace: Process 91851 attached
+ <unfinished ...>
+[pid 91850] execve("./child", ["./child", "child", "1"], 0x7ffddee99fe8 /* 38 vars */ <unfinished ...>
+[pid 91777] <... clone resumed>, child_tidptr=0x7f572d39fa10) = 91851
+[pid 91777] write(1, "[Parent] Child1 created with PID"..., 40[Parent] Child1 created with PID: 91850
+) = 40
+[pid 91777] write(1, "[Parent] Child2 created with PID"..., 40[Parent] Child2 created with PID: 91851
+) = 40
+[pid 91851] execve("./child", ["./child", "child", "2"], 0x7ffddee99fe8 /* 38 vars */ <unfinished ...>
+[pid 91777] write(1, "Enter lines (Ctrl+D / Ctrl+Z to "..., 41Enter lines (Ctrl+D / Ctrl+Z to finish):
+) = 41
+[pid 91851] write(1, "[Child2] PID: 91851, started\n", 29 <unfinished ...>
+[pid 91850] write(1, "[Child1] PID: 91850, started\n", 29 <unfinished ...>
+
+aaaa
+[pid 91777] write(4, "aaaa\n", 5)       = 5
+[pid 91850] write(1, "\n", 1)           = 1
+
+ooooo
+[pid 91777] write(6, "ooooo\n", 6)      = 6
+[pid 91851] write(1, "\n", 1)           = 1
+
+
+lalalal
+[pid 91777] write(4, "lalalal\n", 8)    = 8
+[pid 91850] write(1, "llll\n", 5)       = 5
+aaiaaoa
+[pid 91777] write(6, "aaiaaoa\n", 8)    = 8
+[pid 91851] write(1, "\n", 1)           = 1
+[pid 91777] wait4(91850 <unfinished ...>
+[pid 91850] write(1, "[Child1] PID: 91850, finished\n", 30 <unfinished ...>
+[pid 91851] write(1, "[Child2] PID: 91851, finished\n", 30) = 30
+[pid 91851] exit_group(0 <unfinished ...>
+[pid 91850] exit_group(0 <unfinished ...>
+[pid 91851] <... exit_group resumed>)   = ?
+[pid 91850] <... exit_group resumed>)   = ?
+[pid 91850] +++ exited with 0 +++
+[pid 91777] <... wait4 resumed>, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 91850
+[pid 91851] +++ exited with 0 +++
+--- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=91850, si_uid=1000, si_status=0, si_utime=0, si_stime=0} ---
+wait4(91851, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 91851
+write(1, "[Parent] Child1 (PID: 91850) exi"..., 42[Parent] Child1 (PID: 91850) exit code: 0
+) = 42
+write(1, "[Parent] Child2 (PID: 91851) exi"..., 42[Parent] Child2 (PID: 91851) exit code: 0
+) = 42
+write(1, "[Parent] Results written to: chi"..., 44[Parent] Results written to: child1, child2
+) = 44
+exit_group(0)                           = ?
++++ exited with 0 +++
+\end{lstlisting}
+
+Данный лог наглядно подтверждает, что программа использует требуемые низкоуровневые системные вызовы ядра Linux (\texttt{clone}, \texttt{execve}, \texttt{write}, \texttt{wait4}) для управления процессами и организации IPC, без применения высокоуровневых библиотечных оберток.
+% ------------------------------------------------------------------------------
+% ВЫВОДЫ (src/thinks.tex)
+% ------------------------------------------------------------------------------
+\section{Выводы}
+
+В ходе выполнения лабораторной работы была спроектирована и реализована кроссплатформенная система межпроцессного взаимодействия (IPC) с использованием неименованных каналов. Практическая реализация позволила глубже изучить механизмы, лежащие в основе управления процессами и обмена данными в операционных системах.
+
+Ключевым теоретическим аспектом, подтвержденным на практике, является природа каналов (\texttt{pipe}) как однонаправленных потоков байтов, буферизуемых в адресном пространстве ядра. Системный вызов \texttt{pipe()} (POSIX) или \texttt{CreatePipe()} (Win32) создает пару файловых дескрипторов: один для чтения, другой для записи. Данные, записанные в один конец канала, могут быть прочитаны из другого в порядке FIFO. Важной особенностью является то, что системный вызов \texttt{read()} блокирует процесс-читатель до тех пор, пока не появятся данные или пока все дескрипторы пишущего конца не будут закрыты. Именно поэтому критически важно, чтобы родительский процесс закрыл \textit{все} копии дескрипторов, связанных с пишущим концом канала после \texttt{fork()}, иначе дочерний процесс будет бесконечно блокироваться в ожидании данных, что приведет к взаимоблокировке (deadlock).
+
+Механизм создания дочерних процессов в POSIX реализуется парой вызовов \texttt{fork()} и \texttt{exec()}. Вызов \texttt{fork()} создает точную копию текущего процесса, наследующую все открытые файловые дескрипторы, что является основой для последующего перенаправления потоков. Вызов \texttt{execvp()} заменяет образ памяти дочернего процесса на исполняемый файл, сохраняя при этом перенаправленные дескрипторы. В Windows аналогичная функциональность инкапсулирована в едином системном вызове \texttt{CreateProcess()}, который принимает структуру \texttt{STARTUPINFO} с флагом \texttt{STARTF\_USESTDHANDLES} для явного указания дескрипторов стандартных потоков.
+
+Перенаправление стандартных потоков ввода-вывода достигается посредством системного вызова \texttt{dup2()} (POSIX), который дублирует файловый дескриптор, заменяя им стандартные дескрипторы \texttt{STDIN\_FILENO} (0) и \texttt{STDOUT\_FILENO} (1). Этот механизм демонстрирует принцип прозрачности файловых дескрипторов в UNIX-подобных системах: дочерняя программа (\texttt{child.c}) работает исключительно с абстракциями \texttt{stdin} и \texttt{stdout}, не содержа в себе никакой логики работы с каналами или файлами. Операционная система сама маршрутизирует данные между процессами на уровне ядра.
+
+Ожидание завершения дочерних процессов реализовано через \texttt{waitpid()} (POSIX) и \texttt{WaitForSingleObject()} (Win32). Эти вызовы не только блокируют родительский процесс до завершения дочернего, но и позволяют получить код возврата, а также освободить запись в таблице процессов ядра. Без вызова \texttt{wait()} завершенный дочерний процесс остается в состоянии "зомби" (zombie), занимая место в таблице процессов до завершения родителя.
+
+Также была отработана инженерная практика безопасного управления ресурсами: каждый системный вызов (\texttt{fork}, \texttt{pipe}, \texttt{open}) сопровождается проверкой кода возврата, а выделенные дескрипторы гарантированно освобождаются при любом сценарии выполнения, включая аварийное завершение. Это предотвращает утечки ресурсов и появление зомби-процессов, что соответствует требованиям к надежному системному программированию.
+\pagebreak
+
+
+\section{Список литературы}
+\begin{enumerate}
+    \item Таненбаум Э., Бос Х. Современные операционные системы. – 4-е изд. – СПб.: Питер, 2015.
+\end{enumerate}
+
+\end{document}
