@@ -66,8 +66,8 @@ static int parent_main(int argc, char* argv[]) {
 
     if (file1_handle == -1 || file2_handle == -1)
     {
-        if (file1_handle != -1) close_file_handle(file1_handle);
-        if (file2_handle != -1) close_file_handle(file2_handle);
+        close_file_handle(file1_handle);
+        close_file_handle(file2_handle);
         close_pipe_handle(pipe1.read_handle);
         close_pipe_handle(pipe1.write_handle);
         close_pipe_handle(pipe2.read_handle);
@@ -105,9 +105,9 @@ static int parent_main(int argc, char* argv[]) {
         close_file_handle(file1_handle);
         close_file_handle(file2_handle);
         close_pipe_handle(pipe1.read_handle);
-        if (child1.valid!=1) close_pipe_handle(pipe1.write_handle);
+        close_pipe_handle(pipe1.write_handle);
         close_pipe_handle(pipe2.read_handle);
-        if (child2.valid!=1) close_pipe_handle(pipe2.write_handle);
+        close_pipe_handle(pipe2.write_handle);
         close_process(&child1);
         close_process(&child2);
         return 1;

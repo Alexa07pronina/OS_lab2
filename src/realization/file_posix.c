@@ -24,7 +24,7 @@ ssize_t file_write(intptr_t handle, const char* data, size_t size) {
 }
 
 void close_file_handle(intptr_t handle) {
-    if (close((int)handle) == -1) {
+    if (handle != -1 && close((int)handle) == -1) {
         fprintf(stderr, "Error: close_file_handle() failed: %s\n", strerror(errno));
     }
 }

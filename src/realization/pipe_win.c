@@ -44,7 +44,9 @@ ssize_t pipe_read(intptr_t handle, char* buffer, size_t size) {
 }
 
 void close_pipe_handle(intptr_t handle) {
-    if (!CloseHandle((HANDLE)handle)) {
-        fprintf(stderr, "Error: close_pipe_handle() failed, code: %lu\n", GetLastError());
+    if (handle != -1 && handle != (intptr_t)INVALID_HANDLE_VALUE) {
+        if (!CloseHandle((HANDLE)handle)) {
+            fprintf(stderr, "Error: close_pipe_handle() failed, code: %lu\n", GetLastError());
+        }
     }
 }

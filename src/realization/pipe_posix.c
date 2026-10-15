@@ -41,7 +41,7 @@ ssize_t pipe_read(intptr_t handle, char* buffer, size_t size) {
 }
 
 void close_pipe_handle(intptr_t handle) {
-    if (close((int)handle) == -1) {
+    if ((handle != -1) && close((int)handle) == -1) {
         fprintf(stderr, "Error: close_pipe_handle() failed: %s\n", strerror(errno));
     }
 }

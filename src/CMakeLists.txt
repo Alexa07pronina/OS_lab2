@@ -6,15 +6,15 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 if(WIN32)
     set(PLATFORM_SOURCES
-        src/process_win.c
-        src/pipe_win.c
-        src/file_win.c
+        realization/process_win.c
+        realization/pipe_win.c
+        realization/file_win.c
     )
 else()
     set(PLATFORM_SOURCES
-        src/process_posix.c
-        src/pipe_posix.c
-        src/file_posix.c
+        realization/process_posix.c
+        realization/pipe_posix.c
+        realization/file_posix.c
     )
 endif()
 

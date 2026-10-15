@@ -38,7 +38,9 @@ ssize_t file_write(intptr_t handle, const char* data, size_t size) {
 }
 
 void close_file_handle(intptr_t handle) {
-    if (!CloseHandle((HANDLE)handle)) {
-        fprintf(stderr, "Error: close_file_handle() failed, code: %lu\n", GetLastError());
+    if (handle != -1 && handle != (intptr_t)INVALID_HANDLE_VALUE) {
+        if (!CloseHandle((HANDLE)handle)) {
+            fprintf(stderr, "Error: close_file_handle() failed, code: %lu\n", GetLastError());
+        }
     }
 }
